@@ -4,6 +4,7 @@
   "harnesses": [
     {
       "id": "inline",
+      "verified": "local",
       "bin": null,
       "list": null,
       "traits": "No delegation. The current session does the work itself, with the full conversation already loaded and every tool already granted.",
@@ -17,6 +18,7 @@
     },
     {
       "id": "subagent",
+      "verified": "local",
       "bin": null,
       "list": null,
       "traits": "A sub-agent inside this same harness. It gets a fresh context window and the same tools, and it reports a summary back. No outside login, no separate CLI, and its file reads never enter this session's context.",
@@ -38,10 +40,11 @@
     },
     {
       "id": "codex",
+      "verified": "local",
       "bin": "codex",
       "list": null,
       "traits": "An outside CLI in a read-only sandbox. It reads and reports; it writes no file and changes nothing. Strongest choice for an adversarial second opinion, because it did not write the code it reads.",
-      "launch": "codex exec -m {model} -c model_reasoning_effort='\"medium\"' -c approval_policy='\"never\"' --sandbox read-only --cd {cwd} --skip-git-repo-check --json -o {out} \"$(cat {prompt})\" < /dev/null > {events} 2> {err}",
+      "launch": "codex exec -m {model} -c model_reasoning_effort='\"medium\"' -c approval_policy='\"never\"' --sandbox read-only --cd {cwd} --skip-git-repo-check --json -o {out} \"$(cat {prompt_file})\" < /dev/null > {events} 2> {err}",
       "models": [
         {
           "id": "gpt-6-astra",
@@ -51,10 +54,11 @@
     },
     {
       "id": "cursor-agent",
+      "verified": "local",
       "bin": "cursor-agent",
       "list": "cursor-agent models",
       "traits": "An outside CLI that writes to the working tree and runs commands. The default choice when the task must change files. It does not commit, and it can re-indent what it touches.",
-      "launch": "cursor-agent -p \"<prompt>\" --model {model} --force",
+      "launch": "cursor-agent -p \"$(cat {prompt_file})\" --model {model} --force > {out} 2> {err}",
       "models": [
         {
           "id": "cursor-grok-4.6-high-fast",
@@ -72,10 +76,11 @@
     },
     {
       "id": "opencode",
+      "verified": "local",
       "bin": "opencode",
       "list": "opencode models",
       "traits": "An outside CLI that reaches many providers under one login, so it is where a named non-Anthropic model or a cheap second opinion comes from. Reads and reports by default; it writes only with --auto. Routes and credit run out often, so a run can exit 0 with nothing done.",
-      "launch": "opencode run -m {model} --format json \"<prompt>\" < /dev/null > events.jsonl 2> err.log",
+      "launch": "opencode run -m {model} --format json \"$(cat {prompt_file})\" < /dev/null > {events} 2> {err}",
       "models": [
         {
           "id": "openrouter/google/gemini-3.8-flash",
@@ -85,10 +90,11 @@
     },
     {
       "id": "devin",
+      "verified": "local",
       "bin": "devin",
       "list": "devin models list",
       "traits": "An outside CLI that loads this repository's own AGENTS.md, CLAUDE.md, and Claude Code skills, so it starts with the project's rules already in hand. Writes inside its workspace sandbox. Wide model choice under one login, and no event stream to read while it runs.",
-      "launch": "cd {cwd} && devin --model {model} --sandbox --respect-workspace-trust false --prompt-file {prompt} --export {transcript} -p < /dev/null > {out} 2> {err}",
+      "launch": "cd {cwd} && devin --model {model} --sandbox --respect-workspace-trust false --prompt-file {prompt_file} --export {transcript} -p < /dev/null > {out} 2> {err}",
       "models": [
         {
           "id": "gpt-6-astra-medium",
@@ -103,6 +109,240 @@
           "fits": "A cheap throwaway second opinion from a different model family, at 200K context. Useful when the value is disagreement, not depth."
         }
       ]
+    },
+    {
+      "id": "aider",
+      "verified": "docs",
+      "bin": "aider",
+      "list": "aider --list-models {filter}",
+      "traits": "Writes files on disk and auto-commits each change to git, so it is never read-only. Reads repo conventions from CONVENTIONS.md and .aider.conf.yml. One prompt, one reply, then it exits. Strongest on a well-scoped edit across one or a few files. Its list command takes a substring filter, not an empty argument.",
+      "launch": "aider --model {model} --message \"$(cat {prompt_file})\" --yes-always --no-stream --no-pretty --no-check-update > {out} 2> {err}",
+      "models": [],
+      "source": "https://aider.chat/docs/config/options.html"
+    },
+    {
+      "id": "goose",
+      "verified": "docs",
+      "bin": "goose",
+      "list": null,
+      "traits": "Block's agent. Runs tool calls, file edits, and shell commands directly on disk, so it is never read-only. --no-session writes no history, which suits a one-shot run. A headless run is single-turn, so the prompt must be self-contained: it cannot ask a clarifying question. It has no model-list command, and the provider must be named alongside the model.",
+      "launch": "goose run --no-session --provider {provider} --model {model} -t \"$(cat {prompt_file})\" > {out} 2> {err}",
+      "models": [],
+      "source": "https://goose-docs.ai/docs/guides/running-tasks/"
+    },
+    {
+      "id": "amp",
+      "verified": "docs",
+      "bin": "amp",
+      "list": null,
+      "traits": "Sourcegraph's agent. Writes files directly and is built for long autonomous multi-step edits across a large codebase. It has NO model flag: the {model} slot takes an effort mode, and the only valid words are low, medium, high, and ultra. Needs AMP_API_KEY in the environment for a non-interactive run.",
+      "launch": "amp -x \"$(cat {prompt_file})\" --mode {model} > {out} 2> {err}",
+      "models": [
+        {
+          "id": "low",
+          "fits": "A small mechanical edit whose shape the prompt already fixes. Never a change that crosses files or needs a judgement."
+        },
+        {
+          "id": "medium",
+          "fits": "Ordinary scoped work inside one area of the code. Not a one-line fix, and not an open-ended design question."
+        },
+        {
+          "id": "high",
+          "fits": "Work that needs real reasoning depth across several files. Never a trivial fix, where it only wastes budget."
+        },
+        {
+          "id": "ultra",
+          "fits": "The hardest open-ended work, where correctness matters more than cost. Never the default for routine work."
+        }
+      ],
+      "source": "https://ampcode.com/docs/models-and-subagents"
+    },
+    {
+      "id": "crush",
+      "verified": "docs",
+      "bin": "crush",
+      "list": "crush models",
+      "traits": "Charm's terminal agent. Writes files directly. --quiet drops the spinner so the output stays clean for a script. --yolo is required for an unattended run: without it the run stops at a tool-permission prompt and hangs, because a script cannot answer one.",
+      "launch": "crush run --model {model} --quiet --yolo \"$(cat {prompt_file})\" > {out} 2> {err}",
+      "models": [],
+      "source": "https://charmbracelet-crush.mintlify.app/cli/run"
+    },
+    {
+      "id": "gemini",
+      "verified": "local",
+      "bin": "gemini",
+      "list": null,
+      "traits": "Google's CLI. Writes files and runs tools. --approval-mode yolo auto-approves every tool call, which a script needs because it cannot answer a prompt; swap in --approval-mode plan for a read-only run, but that mode silently falls back to default unless experimental.plan is enabled in settings. Loads repo-local config from .gemini/. It has no model-list command, so ask the user which id their account serves rather than guess.",
+      "launch": "gemini -m {model} -p \"$(cat {prompt_file})\" --approval-mode yolo > {out} 2> {err}",
+      "models": [],
+      "source": "local --help; https://geminicli.com/docs/cli/model/"
+    },
+    {
+      "id": "cline",
+      "verified": "local",
+      "bin": "cline",
+      "list": null,
+      "traits": "Writes files. -a is the write-enabled act mode and -y auto-approves actions so the run never stops for approval; swap -a for -p to get a read-only plan run. It has no model-list command: the id depends on which provider the user authenticated with cline auth, so ask them rather than guess.",
+      "launch": "cline -a -y -m {model} \"$(cat {prompt_file})\" > {out} 2> {err}",
+      "models": [],
+      "source": "local --help"
+    },
+    {
+      "id": "qwen",
+      "verified": "docs",
+      "bin": "qwen",
+      "list": null,
+      "traits": "Writes files. -p is the documented headless flag and exits after one response. --approval-mode yolo auto-approves every tool call including shell, and the docs warn it does not sandbox the run; --approval-mode plan is the read-only alternative. No model-list command.",
+      "launch": "qwen -m {model} -p \"$(cat {prompt_file})\" --approval-mode yolo > {out} 2> {err}",
+      "models": [
+        {
+          "id": "qwen3-coder-plus",
+          "fits": "Real feature work or a refactor that needs capability. Not a trivial ask, where the flash tier is cheaper and fast enough."
+        },
+        {
+          "id": "qwen3-coder-flash",
+          "fits": "A small simple edit or a lookup. Never multi-file reasoning, where it is out of its depth."
+        }
+      ],
+      "source": "https://qwenlm.github.io/qwen-code-docs/en/users/features/headless/"
+    },
+    {
+      "id": "kilocode",
+      "verified": "docs",
+      "bin": "kilo",
+      "list": "kilo models",
+      "traits": "A gateway to many upstream providers, so its model ids are provider/model strings rather than a fixed list. kilo run without -i is non-interactive, and --auto approves permissions the config does not deny, which the docs themselves call dangerous. Run kilo models first: what the account can reach decides the roster, not the docs.",
+      "launch": "kilo run \"$(cat {prompt_file})\" -m {model} --auto > {out} 2> {err}",
+      "models": [],
+      "source": "https://kilo.ai/docs/code-with-ai/platforms/cli-reference"
+    },
+    {
+      "id": "roo",
+      "verified": "docs",
+      "bin": "roo",
+      "list": null,
+      "traits": "Writes files. --print gives non-interactive machine-readable output and exits after one run. Tool, command, browser, and MCP actions are auto-approved by default; -a turns manual approval on, so omitting it is already the non-interactive setting. Takes provider/model strings and has no list command.",
+      "launch": "roo --print --model {model} \"$(cat {prompt_file})\" > {out} 2> {err}",
+      "models": [],
+      "source": "https://raw.githubusercontent.com/RooCodeInc/Roo-Code/main/apps/cli/README.md"
+    },
+    {
+      "id": "copilot",
+      "verified": "docs",
+      "bin": "copilot",
+      "list": null,
+      "traits": "GitHub's terminal agent. Writes files and runs shell commands. --allow-all-tools and --no-ask-user are both needed headless: without them the run stops for a permission or a question that a script cannot answer. Loads repo AGENTS.md and .github skills. It can be locked down instead with --available-tools or --deny-tool, and --add-dir widens the allowed paths. No model-list command.",
+      "launch": "copilot -p \"$(cat {prompt_file})\" --allow-all-tools --no-ask-user --model {model} --output-format json > {events} 2> {err}",
+      "models": [
+        {
+          "id": "gpt-5.4",
+          "fits": "General coding work, the id the CLI's own examples use. Not for work that needs a specific reasoning tier unless you also pass --reasoning-effort."
+        },
+        {
+          "id": "claude-haiku-4.5",
+          "fits": "A small low-risk edit or a summary where speed matters. Never a large multi-file refactor. Prefer a plain sub-agent for a Claude model unless you need Copilot's own tools."
+        }
+      ],
+      "source": "https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-programmatic-reference"
+    },
+    {
+      "id": "droid",
+      "verified": "docs",
+      "bin": "droid",
+      "list": null,
+      "traits": "Factory's headless mode, built for CI and cron; the bare droid command is a separate full-screen TUI that would hang a script. It is read-only by default, so --auto low|medium|high is what lets it write; drop --auto entirely for a reviewer that cannot touch the tree. Exits non-zero on a permission violation or an unmet objective. No model-list command.",
+      "launch": "droid exec --auto low --model {model} \"$(cat {prompt_file})\" > {out} 2> {err}",
+      "models": [
+        {
+          "id": "gpt-5.3-codex",
+          "fits": "Autonomous code-writing runs, the id shown as the default in its own headless examples. Not the cheapest option, so not for bulk mechanical work."
+        }
+      ],
+      "source": "https://docs.factory.ai/droid-exec/overview"
+    },
+    {
+      "id": "cn",
+      "verified": "docs",
+      "bin": "cn",
+      "list": null,
+      "traits": "Continue's CLI. Writes files. -p gives non-interactive output and --auto allows every tool with no prompts. Its --model takes a Continue hub slug such as owner/package, never a raw provider model id, so the caller needs hub access. Default tool policy lives in ~/.continue/permissions.yaml.",
+      "launch": "cn -p \"$(cat {prompt_file})\" --auto --model {model} > {out} 2> {err}",
+      "models": [
+        {
+          "id": "anthropic/claude-sonnet-4-6",
+          "fits": "General edit and apply work through the Continue hub. Must be passed as a hub slug; a bare provider id does not resolve. Prefer a plain sub-agent for a Claude model unless you need the hub."
+        }
+      ],
+      "source": "https://docs.continue.dev/cli/tool-permissions"
+    },
+    {
+      "id": "openhands",
+      "verified": "docs",
+      "bin": "openhands",
+      "list": null,
+      "traits": "Writes files. --headless already auto-approves every action, so it needs no extra approval flag, and the risk-gated --llm-approve mode is unavailable there. It has no --model flag at all: --override-with-envs is what makes it read LLM_MODEL, LLM_API_KEY, and LLM_BASE_URL from the environment. This is the PyPI openhands SDK CLI, not the separate lightweight OpenHands-CLI binary.",
+      "launch": "LLM_MODEL={model} openhands --headless --override-with-envs -t \"$(cat {prompt_file})\" > {out} 2> {err}",
+      "models": [],
+      "source": "https://docs.openhands.dev/openhands/usage/cli/headless"
+    },
+    {
+      "id": "muse",
+      "verified": "local",
+      "bin": "muse",
+      "list": null,
+      "traits": "Keeps approval and an OS sandbox on by default, which few agent CLIs do. --approval-mode never makes it non-interactive without giving up that sandbox, and --trust-workspace loads the repo's own skills and rules. Add --disable-write to make the whole run read-only, which turns it into a reviewer that cannot touch the tree. Avoid --yolo: it drops approval and the sandbox together. It has no model-list command, and a bare argument is read as a prompt, so never probe it by guessing a subcommand.",
+      "launch": "muse exec --model {model} --prompt-file {prompt_file} --approval-mode never --trust-workspace --json > {events} 2> {err}",
+      "models": [],
+      "source": "local: muse exec --help"
+    },
+    {
+      "id": "openclaw",
+      "verified": "local",
+      "bin": "openclaw",
+      "list": "openclaw models list",
+      "traits": "A chat gateway, not a coding agent. `infer model run` is one-shot text inference with no file tools at all, so it can never touch the tree. That makes it the cheapest honest second opinion on a question you can state in text, and useless for anything that must read a repository or change a file.",
+      "launch": "openclaw infer model run --model {model} --prompt \"$(cat {prompt_file})\" --json > {out} 2> {err}",
+      "models": [
+        {
+          "id": "openrouter/google/gemini-3-flash-preview",
+          "fits": "A fast text-only opinion on a question the prompt states in full. Never work that must read files or write them, because this path has no tools."
+        },
+        {
+          "id": "openrouter/auto",
+          "fits": "A loose one-off query where any capable model will do. Never work whose result must be reproducible, because the router picks a different model run to run."
+        }
+      ],
+      "source": "local: openclaw models list"
+    },
+    {
+      "id": "command-code",
+      "verified": "local",
+      "bin": "command-code",
+      "list": "command-code --list-models",
+      "traits": "A full coding agent with file and shell tools that reads and writes AGENTS.md. --permission-mode auto-accept keeps it non-interactive without the blanket bypass that --yolo applies; --permission-mode plan makes a run read-only. A headless run withholds some tools unless --tools-all is added. Its --list-models prints about 70 ids across many vendors, so read that rather than trust a seed.",
+      "launch": "command-code -p \"$(cat {prompt_file})\" --model {model} --permission-mode auto-accept --output-format json --max-turns 60 > {events} 2> {err}",
+      "models": [
+        {
+          "id": "qwen/qwen3.8-max-0902",
+          "fits": "A frontier non-Anthropic opinion on long-horizon agentic work, useful exactly because it is a different vendor. Not for work that leans on Anthropic-specific tool behaviour."
+        },
+        {
+          "id": "claude-sonnet-5",
+          "fits": "Routine coding work when you want this CLI's own tools and its taste learning. Prefer a plain sub-agent for a Claude model when you do not need those, since a sub-agent costs one less hop."
+        }
+      ],
+      "source": "local: command-code --help and --list-models"
     }
-  ]
+  ],
+  "placeholders": {
+    "{model}": "The model id. The plugin substitutes this for you; it never remains.",
+    "{prompt_file}": "Path to a file you wrote that holds the full delegation prompt.",
+    "{cwd}": "Absolute path of the repository the run should read.",
+    "{out}": "Path for the run's final answer.",
+    "{err}": "Path for the run's stderr.",
+    "{events}": "Path for the run's JSON event stream, where it has one.",
+    "{transcript}": "Path for a full tool-call transcript, where the CLI exports one.",
+    "{provider}": "Provider name, where the CLI needs one named beside the model."
+  },
+  "verified_meaning": "local = the launch line was confirmed first-hand, from a run or from the CLI's own help output. docs = it comes from documentation only and has never run here. Setup must say which one it is before a user allowlists an entry, because an untested launch line fails in their terminal, not in ours."
 }

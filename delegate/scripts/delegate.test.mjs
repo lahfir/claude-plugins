@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { allowlistPath, buildRequest, entries, loadCatalog, onPath, readAnswer, resolve } from "./delegate.mjs";
+import { allowlistPath, buildRequest, entries, holes, loadCatalog, onPath, readAnswer, resolve } from "./delegate.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cli = join(here, "delegate.mjs");
@@ -21,6 +21,16 @@ for (const e of all) {
   assert.ok(e.rubric.startsWith(`Runs under ${e.harness}.`), `${e.key} rubric hides its harness`);
 }
 assert.ok(all.some((e) => e.key === "inline:this-session"), "inline is always a candidate");
+
+// One placeholder convention. A `<prompt>` next to a `{prompt_file}` makes a caller
+// guess whether the prompt is inline text or a path, and a wrong guess starts a real
+// paid run. Every hole is {braced}, and every one of them is documented.
+for (const h of catalog.harnesses) {
+  assert.ok(!/<[a-z_]+>/.test(h.launch), `${h.id} launch still uses the <angle> form`);
+  for (const ph of holes(h.launch)) {
+    assert.ok(catalog.placeholders[ph], `${h.id} uses undocumented placeholder ${ph}`);
+  }
+}
 
 // PATH lookup finds a real binary and misses a fake one.
 assert.ok(onPath("node"));
@@ -76,6 +86,9 @@ assert.equal(r[2].key, "opencode:openrouter/deepseek/deepseek-v4.1-flash");
 assert.ok(r[2].launch.startsWith("OPENCODE_CONFIG_CONTENT="));
 assert.ok(r[2].launch.includes("-m openrouter/deepseek/deepseek-v4.1-flash"), "{model} substituted in the override");
 assert.ok(!r[2].launch.includes("{model}"));
+// {model} is the one value the plugin knows, so it is never left for the caller.
+for (const e of r) assert.ok(!e.placeholders.includes("{model}"), `${e.key} left {model} unfilled`);
+assert.deepEqual(resolve(catalog, { entries: [{ harness: "inline", model: "this-session", fits: "f" }] })[0].placeholders, []);
 
 // A harness the catalog lost is reported, not crashed on.
 assert.equal(resolve(catalog, { entries: [{ harness: "gone", model: "m", fits: "f" }] })[0].known, false);
@@ -101,7 +114,7 @@ writeFileSync(
   JSON.stringify({
     harnesses: [
       { id: "subagent", models: [{ id: "custom", fits: "a model the user added" }] },
-      { id: "aider", bin: "aider", traits: "An outside CLI.", launch: "aider --model {model}", models: [{ id: "x", fits: "y" }] },
+      { id: "zz-not-a-real-harness", bin: "zz-not-a-real-harness", traits: "An outside CLI.", launch: "zz --model {model}", models: [{ id: "x", fits: "y" }] },
     ],
   }),
 );
@@ -112,6 +125,6 @@ assert.equal(merged.catalog_overlay, overlay);
 assert.equal(merged.harnesses.length, catalog.harnesses.length + 1);
 assert.ok(merged.harnesses.find((h) => h.id === "subagent").suggested.some((m) => m.id === "custom"));
 assert.equal(merged.harnesses.find((h) => h.id === "opencode").list, "opencode models");
-assert.equal(merged.harnesses.find((h) => h.id === "aider").available, false);
+assert.equal(merged.harnesses.find((h) => h.id === "zz-not-a-real-harness").available, false);
 
 console.log("ok");

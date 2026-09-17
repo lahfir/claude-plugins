@@ -13,6 +13,10 @@
  * Detection is the floor: route drops an entry whose CLI is not on this machine right
  * now, so the same allowlist travels between devices.
  *
+ * This script never starts a run. It reads files, asks TypeSafe one question, and
+ * prints the exact command to run plus the placeholders still to fill. Launching is
+ * the caller's job -- that is why there is no child_process import anywhere here.
+ *
  * Env: TYPESAFE_API_KEY (without it, route reports the roster and you decide),
  *      DELEGATE_ALLOWLIST and DELEGATE_CATALOG (path overrides),
  *      CLAUDE_CONFIG_DIR (default location for both).
@@ -74,6 +78,12 @@ export const entries = (catalog) =>
     })),
   );
 
+/** The model is the one value the plugin knows, so it is the one it substitutes. */
+export const fill = (launch, model) => launch.replaceAll("{model}", model);
+
+/** Placeholders a caller must still fill before the command can run. */
+export const holes = (launch) => [...new Set(launch.match(/\{[a-z_]+\}/g) ?? [])];
+
 /**
  * Allowlist entries joined to their harness. The rubric is the harness's bundled
  * `traits` plus the entry's own `fits`, so a catalog update still reaches every
@@ -95,7 +105,8 @@ export const resolve = (catalog, list) => {
       harness: e.harness,
       model: e.model,
       known: Boolean(h),
-      launch: (e.launch ?? h?.launch ?? "").replaceAll("{model}", e.model),
+      launch: fill(e.launch ?? h?.launch ?? "", e.model),
+      placeholders: holes(fill(e.launch ?? h?.launch ?? "", e.model)),
       rubric: h ? `Runs under ${h.id}. ${h.traits} ${e.fits}` : e.fits,
     };
   });
@@ -128,10 +139,12 @@ const detect = (catalog) =>
     allowlist_path: allowlistPath(),
     allowlist_exists: existsSync(allowlistPath()),
     catalog_overlay: existsSync(overlayPath()) ? overlayPath() : null,
+    placeholders: catalog.placeholders,
     harnesses: catalog.harnesses.map((h) => ({
       id: h.id,
       available: available(h),
       always_present: h.bin === null,
+      verified: h.verified ?? "docs",
       traits: h.traits,
       list: h.list,
       suggested: h.models.map((m) => ({ id: m.id, fits: m.fits })),
@@ -209,6 +222,7 @@ const route = async (catalog, task) => {
     harness: pick.harness,
     model: pick.model,
     launch: pick.launch,
+    placeholders: pick.placeholders,
     confidence: answer.confidence,
     threshold,
     below_threshold: answer.confidence < threshold,

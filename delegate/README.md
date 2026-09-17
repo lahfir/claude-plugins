@@ -39,9 +39,22 @@ no bundled file can describe them.
 | Harness | `traits`, `bin`, default `launch`, the `list` command | `catalog.json` (bundled) |
 | Model | the `fits` line, optional `launch` override | your allowlist |
 
-Six harnesses ship: `inline`, `subagent`, `codex`, `cursor-agent`, `opencode`, and
-`devin`. `catalog.json` also carries a few **suggested** models per harness to seed a
+**22 harnesses ship.** Two are internal (`inline`, `subagent`); the rest are outside
+CLIs. `catalog.json` also carries a few **suggested** models per harness to seed a
 setup. They are a seed, not a roster — setup reads the real list from the harness.
+
+| `verified` | Harnesses |
+|---|---|
+| `local` — the launch line was confirmed first-hand here | `inline`, `subagent`, `codex`, `cursor-agent`, `opencode`, `devin`, `gemini`, `cline`, `muse`, `openclaw`, `command-code` |
+| `docs` — from documentation, never run here | `aider`, `goose`, `amp`, `crush`, `qwen`, `kilocode`, `roo`, `copilot`, `droid`, `cn`, `openhands` |
+
+A `docs` entry's first run is also its first test, and the failure lands in your
+terminal. Setup says which before you allowlist one.
+
+Not every harness is a coding agent, and that is the point. `openclaw` has no file
+tools at all, so it gives a text-only second opinion that cannot touch your tree.
+`codex` and `droid` are read-only by default. `muse` keeps an OS sandbox on while
+running headless, and `muse exec --disable-write` makes a whole run read-only.
 
 At route time the rubric is the harness's `traits` plus the entry's own `fits`, so a
 catalog update still reaches every entry you already allowlisted.

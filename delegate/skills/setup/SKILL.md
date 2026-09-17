@@ -27,8 +27,10 @@ allowlist will be written.
 
 One call, two questions. Both `multiSelect: true`.
 
-- **Q1, outside CLIs.** Only those whose `available` is true. There are at most four,
-  so they fit. Use each harness's `traits`, shortened, as the option description.
+- **Q1, outside CLIs.** Only those whose `available` is true. A picker holds four
+  options. If more than four are available, ask the first four, then make a second
+  call for the rest. Use each harness's `traits`, shortened, as the option
+  description.
 - **Q2, sub-agent models.** The three in `subagent.suggested`: haiku, sonnet, opus.
   This is a small fixed set, so a picker is the right tool here.
 
@@ -36,6 +38,11 @@ One call, two questions. Both `multiSelect: true`.
 answer "keep this one yourself".
 
 Say in your summary which harnesses you skipped, and that the CLI is missing.
+
+**Say `verified` out loud for every option you offer.** `local` means the launch line
+was confirmed first-hand. `docs` means it comes from documentation and has never run
+on any machine here, so its first run is also its first test. The user deserves that
+before they allowlist it, because the failure lands in their terminal.
 
 ## 3. Choose models inside each outside CLI, in conversation
 

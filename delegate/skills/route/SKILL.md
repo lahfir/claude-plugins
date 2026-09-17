@@ -35,16 +35,33 @@ without the model, and say once that setting the key turns the judgement on.
 An error that says `no allowlist` means the machine is not set up. Tell the user to
 run `/delegate:setup`.
 
-## Launch it
+## The plugin decides. You launch.
 
-Each entry carries a `launch` hint: the Agent tool for `subagent`, a command shape for
-an outside CLI, and "do it here" for `inline`. The hint is the minimum correct shape,
-not the full procedure.
+The script never starts a run. It has no `child_process` import. It returns the exact
+command and the placeholders you must still fill. Running it is your job.
+
+`launch` already has `{model}` substituted. Everything still in `placeholders` is
+yours to fill:
+
+| Placeholder | You supply |
+|---|---|
+| `{prompt_file}` | Path to a file you wrote that holds the full delegation prompt |
+| `{cwd}` | Absolute path of the repository the run should read |
+| `{out}` | Path for the run's final answer |
+| `{err}` | Path for the run's stderr |
+| `{events}` | Path for the JSON event stream, where the CLI has one |
+| `{transcript}` | Path for a full tool-call transcript, where the CLI exports one |
+
+Write the prompt to a file first, then substitute. Do not inline a long prompt into
+the command; quoting breaks on it.
+
+For `subagent`, `launch` names the Agent tool and the model. For `inline`, it tells
+you to do the work here.
 
 **Before you start an outside CLI, read the `outside-harness-cli` skill if it is
 installed.** It carries the rules that keep a run safe: background only, one writer
-per file, no gates inside the run, stop by pid, and how to tell a live run from a dead
-one. Without those rules an outside run collides with your own work.
+per file, no gates inside the run, stop by pid, and how to tell a live run from a
+dead one. Without those rules an outside run collides with your own work.
 
 Report the pick and its confidence to the user before you launch anything. Routing is
-advice; starting a run is an action they should see coming.
+advice; starting a run spends money and can write files, so they should see it coming.
