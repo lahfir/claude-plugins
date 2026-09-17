@@ -1,0 +1,102 @@
+{
+  "note": "What each harness is and what each model inside it is good at. `traits` describes the harness; `fits` describes the model. Both strings go to TypeSafe as the rubric for one option, so write them as plain judgement, not marketing. No Fable-class model appears here, by construction. Edit this file to add a model: run the harness's own list command for exact ids (`devin models list`, `opencode models`), then write a `fits` line that says what the model should and should not get.",
+  "confidence_threshold": 0.55,
+  "harnesses": [
+    {
+      "id": "inline",
+      "bin": null,
+      "traits": "No delegation. The current session does the work itself, with the full conversation already loaded and every tool already granted.",
+      "launch": "Do the work in this session. Start no agent and no CLI.",
+      "models": [
+        {
+          "id": "this-session",
+          "fits": "The work needs context that only this session holds, is short enough that a handoff costs more than the work, or is a judgement the user is waiting on right now. Also correct when the task needs more capability than any allowed sub-agent model."
+        }
+      ]
+    },
+    {
+      "id": "subagent",
+      "bin": null,
+      "traits": "A sub-agent inside this same harness. It gets a fresh context window and the same tools, and it reports a summary back. No outside login, no separate CLI, and its file reads never enter this session's context.",
+      "launch": "Agent tool: subagent_type general-purpose, model {model}.",
+      "models": [
+        {
+          "id": "haiku",
+          "fits": "Mechanical work whose correct output is already decided: bulk renames, applying an explicit list of edits, tracker field updates, gathering files that match a pattern. Never work that decides what a test claims or where a boundary sits."
+        },
+        {
+          "id": "sonnet",
+          "fits": "The default sub-agent. Solid reasoning at moderate cost: a broad search across a repository, a diff checked against a report that is already validated, a real scenario run against a live server. Not for deciding whether a contested finding is real."
+        },
+        {
+          "id": "opus",
+          "fits": "The strongest sub-agent. Work that decides whether a claim is true: validating a finding at its cited line, judging where a boundary sits, writing a blast-radius block. Pure cost on bulk edits."
+        }
+      ]
+    },
+    {
+      "id": "codex",
+      "bin": "codex",
+      "traits": "An outside CLI in a read-only sandbox. It reads and reports; it writes no file and changes nothing. Strongest choice for an adversarial second opinion, because it did not write the code it reads.",
+      "launch": "codex exec -m {model} -c model_reasoning_effort='\"medium\"' -c approval_policy='\"never\"' --sandbox read-only --cd {cwd} --skip-git-repo-check --json -o {out} \"$(cat {prompt})\" < /dev/null > {events} 2> {err}",
+      "models": [
+        {
+          "id": "gpt-6-astra",
+          "fits": "Review, audit, adversarial critique, and review of a plan or a document. Send it work whose value is an honest verdict on code somebody else wrote. It cannot implement anything."
+        }
+      ]
+    },
+    {
+      "id": "cursor-agent",
+      "bin": "cursor-agent",
+      "traits": "An outside CLI that writes to the working tree and runs commands. The default choice when the task must change files. It does not commit, and it can re-indent what it touches.",
+      "launch": "cursor-agent -p \"<prompt>\" --model {model} --force",
+      "models": [
+        {
+          "id": "cursor-grok-4.6-high-fast",
+          "fits": "The default implementer. Implements from a plan, applies a validated fix, runs the gate and fixes its own failures. Handles a diff that crosses several packages."
+        },
+        {
+          "id": "cursor-grok-4.6-high",
+          "fits": "The same capability, slower and more careful. For a change whose failure path nobody reads: reordered side effects, a new guard, a new catch, or a change whose blast radius crosses packages."
+        },
+        {
+          "id": "composer-2.5",
+          "fits": "Cheap tier. A narrow mechanical edit inside one file whose shape the prompt already fixes. Not for a run that must decide anything."
+        }
+      ]
+    },
+    {
+      "id": "opencode",
+      "bin": "opencode",
+      "traits": "An outside CLI that reaches many providers under one login, so it is where a named non-Anthropic model or a cheap second opinion comes from. Reads and reports by default; it writes only with --auto. Routes and credit run out often, so a run can exit 0 with nothing done.",
+      "launch": "opencode run -m {model} --format json \"<prompt>\" < /dev/null > events.jsonl 2> err.log",
+      "models": [
+        {
+          "id": "openrouter/google/gemini-3.8-flash",
+          "fits": "A read-only reviewer over a large diff. Long context at low cost, so it reads a whole change in one pass and reports. Runs nothing, decides nothing contested."
+        }
+      ]
+    },
+    {
+      "id": "devin",
+      "bin": "devin",
+      "traits": "An outside CLI that loads this repository's own AGENTS.md, CLAUDE.md, and Claude Code skills, so it starts with the project's rules already in hand. Writes inside its workspace sandbox. Wide model choice under one login, and no event stream to read while it runs.",
+      "launch": "cd {cwd} && devin --model {model} --sandbox --respect-workspace-trust false --prompt-file {prompt} --export {transcript} -p < /dev/null > {out} 2> {err}",
+      "models": [
+        {
+          "id": "gpt-6-astra-medium",
+          "fits": "The default here. Work that needs the repository's own rules and skills loaded: a review that must apply the project's standards, or an audit against a house convention a general model does not know."
+        },
+        {
+          "id": "gpt-5-6-luna-low",
+          "fits": "A cheap probe or a smoke test. Confirms a setup works or answers a shallow question. Never a verdict anything later builds on."
+        },
+        {
+          "id": "glm-5-2",
+          "fits": "A cheap throwaway second opinion from a different model family, at 200K context. Useful when the value is disagreement, not depth."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "lahfir-plugins",
+  "description": "Claude Code plugins by Lahfir.",
+  "owner": {
+    "name": "Lahfir",
+    "url": "https://github.com/lahfir"
+  },
+  "plugins": [
+    {
+      "name": "delegate",
+      "source": "./delegate",
+      "description": "Picks who runs a task: this session, a sub-agent, or an outside CLI. Detects the harnesses a machine has, keeps an allowlist you control, and asks TypeSafe which allowlisted entry fits.",
+      "category": "workflow",
+      "keywords": ["delegation", "routing", "subagent", "codex", "cursor-agent", "opencode", "devin", "typesafe"],
+      "license": "MIT"
+    }
+  ]
+}

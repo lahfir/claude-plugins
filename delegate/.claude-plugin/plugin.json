@@ -1,0 +1,8 @@
+{
+  "name": "delegate",
+  "description": "Picks the harness and model for a task: this session, a sub-agent, or an outside CLI. Detects what the machine has, keeps an allowlist you control, and asks TypeSafe which allowlisted entry fits.",
+  "version": "0.1.0",
+  "author": { "name": "Lahfir" },
+  "homepage": "https://github.com/lahfir",
+  "license": "MIT"
+}
