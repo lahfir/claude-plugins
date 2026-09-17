@@ -228,7 +228,7 @@
     },
     {
       "id": "copilot",
-      "verified": "docs",
+      "verified": "local",
       "bin": "copilot",
       "list": null,
       "traits": "GitHub's terminal agent. Writes files and runs shell commands. --allow-all-tools and --no-ask-user are both needed headless: without them the run stops for a permission or a question that a script cannot answer. Loads repo AGENTS.md and .github skills. It can be locked down instead with --available-tools or --deny-tool, and --add-dir widens the allowed paths. No model-list command.",
@@ -243,7 +243,7 @@
           "fits": "A small low-risk edit or a summary where speed matters. Never a large multi-file refactor. Prefer a plain sub-agent for a Claude model unless you need Copilot's own tools."
         }
       ],
-      "source": "https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-programmatic-reference"
+      "source": "https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-programmatic-reference (run here via npx/uvx; the binary is not on PATH)"
     },
     {
       "id": "droid",
@@ -262,7 +262,7 @@
     },
     {
       "id": "cn",
-      "verified": "docs",
+      "verified": "local",
       "bin": "cn",
       "list": null,
       "traits": "Continue's CLI. Writes files. -p gives non-interactive output and --auto allows every tool with no prompts. Its --model takes a Continue hub slug such as owner/package, never a raw provider model id, so the caller needs hub access. Default tool policy lives in ~/.continue/permissions.yaml.",
@@ -273,17 +273,17 @@
           "fits": "General edit and apply work through the Continue hub. Must be passed as a hub slug; a bare provider id does not resolve. Prefer a plain sub-agent for a Claude model unless you need the hub."
         }
       ],
-      "source": "https://docs.continue.dev/cli/tool-permissions"
+      "source": "https://docs.continue.dev/cli/tool-permissions (run here via npx/uvx; the binary is not on PATH)"
     },
     {
       "id": "openhands",
-      "verified": "docs",
+      "verified": "local",
       "bin": "openhands",
       "list": null,
       "traits": "Writes files. --headless already auto-approves every action, so it needs no extra approval flag, and the risk-gated --llm-approve mode is unavailable there. It has no --model flag at all: --override-with-envs is what makes it read LLM_MODEL, LLM_API_KEY, and LLM_BASE_URL from the environment. This is the PyPI openhands SDK CLI, not the separate lightweight OpenHands-CLI binary.",
       "launch": "LLM_MODEL={model} openhands --headless --override-with-envs -t \"$(cat {prompt_file})\" > {out} 2> {err}",
       "models": [],
-      "source": "https://docs.openhands.dev/openhands/usage/cli/headless"
+      "source": "https://docs.openhands.dev/openhands/usage/cli/headless (run here via npx/uvx; the binary is not on PATH)"
     },
     {
       "id": "muse",
@@ -344,5 +344,5 @@
     "{transcript}": "Path for a full tool-call transcript, where the CLI exports one.",
     "{provider}": "Provider name, where the CLI needs one named beside the model."
   },
-  "verified_meaning": "local = the launch line was confirmed first-hand, from a run or from the CLI's own help output. docs = it comes from documentation only and has never run here. Setup must say which one it is before a user allowlists an entry, because an untested launch line fails in their terminal, not in ours."
+  "verified_meaning": "local = the launch line was confirmed first-hand, from a run or from the CLI's own help output, including through a runner such as npx or uvx. docs = it comes from documentation and has never run here. This is separate from `available`, which asks only whether `bin` is on PATH right now. A harness can be verified local and still be unavailable, which just means the user has not installed it yet."
 }

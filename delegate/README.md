@@ -45,11 +45,16 @@ setup. They are a seed, not a roster — setup reads the real list from the harn
 
 | `verified` | Harnesses |
 |---|---|
-| `local` — the launch line was confirmed first-hand here | `inline`, `subagent`, `codex`, `cursor-agent`, `opencode`, `devin`, `gemini`, `cline`, `muse`, `openclaw`, `command-code` |
-| `docs` — from documentation, never run here | `aider`, `goose`, `amp`, `crush`, `qwen`, `kilocode`, `roo`, `copilot`, `droid`, `cn`, `openhands` |
+| `local` — launch line confirmed first-hand, `npx` and `uvx` included | `inline`, `subagent`, `codex`, `cursor-agent`, `opencode`, `devin`, `gemini`, `cline`, `copilot`, `cn`, `openhands`, `muse`, `openclaw`, `command-code` |
+| `docs` — from documentation, never run here | `aider`, `goose`, `amp`, `crush`, `qwen`, `kilocode`, `roo`, `droid` |
 
 A `docs` entry's first run is also its first test, and the failure lands in your
 terminal. Setup says which before you allowlist one.
+
+`verified` and `available` answer different questions. `verified` asks whether the
+launch line was ever confirmed; `available` asks only whether `bin` is on PATH right
+now. A harness can be `local` and unavailable, which just means you have not installed
+it yet.
 
 Not every harness is a coding agent, and that is the point. `openclaw` has no file
 tools at all, so it gives a text-only second opinion that cannot touch your tree.
