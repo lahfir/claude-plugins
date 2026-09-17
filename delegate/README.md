@@ -31,17 +31,34 @@ returns no probability.
 
 ## What it knows
 
-`catalog.json` carries every harness and model with a line on what it is good at and
-what it is bad at. Those lines are the whole rubric, so they are written to be honest
-about weaknesses. Six harnesses ship: `inline`, `subagent`, `codex`, `cursor-agent`,
-`opencode`, and `devin`. No Fable-class model is in the catalog, and a test enforces
-that.
+Knowledge splits by scale. opencode lists 959 models, devin 392, cursor-agent 227, so
+no bundled file can describe them.
 
-Add your own in `~/.claude/delegate-catalog.json`, which a plugin update never
-touches. Same shape as `catalog.json`; a harness id that already exists gains the
-models you list. Get the exact id from the harness's own list command
-(`devin models list`, `opencode models`), then write its `fits` line. Set
-`DELEGATE_CATALOG` to put the overlay somewhere else.
+| Layer | Holds | Lives in |
+|---|---|---|
+| Harness | `traits`, `bin`, default `launch`, the `list` command | `catalog.json` (bundled) |
+| Model | the `fits` line, optional `launch` override | your allowlist |
+
+Six harnesses ship: `inline`, `subagent`, `codex`, `cursor-agent`, `opencode`, and
+`devin`. `catalog.json` also carries a few **suggested** models per harness to seed a
+setup. They are a seed, not a roster — setup reads the real list from the harness.
+
+At route time the rubric is the harness's `traits` plus the entry's own `fits`, so a
+catalog update still reaches every entry you already allowlisted.
+
+**`fits` decides routing quality.** It must say what the model should get *and* what
+it must not get. A line with only praise makes that option win everything.
+
+**Per-model launch config** goes in the entry's optional `launch`, which replaces the
+harness template for that entry and still substitutes `{model}`:
+
+```
+OPENCODE_CONFIG_CONTENT='{"provider":{"openrouter":{"models":{...}}}}' opencode run -m {model} --format json "<prompt>"
+```
+
+To add a whole **harness** the catalog does not ship, use the overlay at
+`~/.claude/delegate-catalog.json`, which a plugin update never touches. Adding a
+**model** needs no overlay — rerun setup, or edit the allowlist.
 
 ## Check
 

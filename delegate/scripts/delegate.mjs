@@ -3,12 +3,15 @@
  * delegate -- decide who runs a task: this session, a sub-agent, or an outside CLI.
  *
  *   delegate.mjs detect                       what this machine can reach, as JSON
- *   delegate.mjs save '["subagent:sonnet"]'   write the allowlist (also reads stdin)
+ *   delegate.mjs save '[{...}]'              write the allowlist (also reads stdin)
  *   delegate.mjs route "<task>"               ask TypeSafe which allowlisted entry fits
  *
- * catalog.json holds the knowledge. The allowlist holds the policy: the ceiling of
- * what may ever be picked. Detection is the floor -- route drops an entry whose CLI
- * is not on this machine right now, so the same allowlist travels between devices.
+ * catalog.json holds harness knowledge: what the harness is, how to launch it, and
+ * the command that lists its models. The allowlist holds model knowledge and policy:
+ * which models you permit and what each one is good and bad at. The split is forced
+ * by scale -- opencode alone lists 959 models, so no bundled file can describe them.
+ * Detection is the floor: route drops an entry whose CLI is not on this machine right
+ * now, so the same allowlist travels between devices.
  *
  * Env: TYPESAFE_API_KEY (without it, route reports the roster and you decide),
  *      DELEGATE_ALLOWLIST and DELEGATE_CATALOG (path overrides),
@@ -57,7 +60,7 @@ export const onPath = (bin) => {
 
 export const available = (h) => h.bin === null || onPath(h.bin);
 
-/** Every catalog model as one flat candidate, keyed harness:model. */
+/** The catalog's suggested models as flat candidates. A seed for setup, not a roster. */
 export const entries = (catalog) =>
   catalog.harnesses.flatMap((h) =>
     h.models.map((m) => ({
@@ -70,6 +73,33 @@ export const entries = (catalog) =>
       rubric: `Runs under ${h.id}. ${h.traits} ${m.fits}`,
     })),
   );
+
+/**
+ * Allowlist entries joined to their harness. The rubric is the harness's bundled
+ * `traits` plus the entry's own `fits`, so a catalog update still reaches every
+ * entry while the per-model judgement stays where the user wrote it.
+ */
+export const resolve = (catalog, list) => {
+  if (!Array.isArray(list.entries)) {
+    throw new Error(
+      list.keys
+        ? "allowlist is in the old keys format -- rerun /delegate:setup"
+        : "allowlist has no entries array -- rerun /delegate:setup",
+    );
+  }
+  const byId = new Map(catalog.harnesses.map((h) => [h.id, h]));
+  return list.entries.map((e) => {
+    const h = byId.get(e.harness);
+    return {
+      key: `${e.harness}:${e.model}`,
+      harness: e.harness,
+      model: e.model,
+      known: Boolean(h),
+      launch: (e.launch ?? h?.launch ?? "").replaceAll("{model}", e.model),
+      rubric: h ? `Runs under ${h.id}. ${h.traits} ${e.fits}` : e.fits,
+    };
+  });
+};
 
 export const buildRequest = (task, candidates) => ({
   state: { task },
@@ -103,41 +133,53 @@ const detect = (catalog) =>
       available: available(h),
       always_present: h.bin === null,
       traits: h.traits,
-      models: h.models.map((m) => ({ key: `${h.id}:${m.id}`, id: m.id, fits: m.fits })),
+      list: h.list,
+      suggested: h.models.map((m) => ({ id: m.id, fits: m.fits })),
     })),
   });
 
 const save = (catalog, raw) => {
-  let keys;
+  let entries;
   try {
-    keys = JSON.parse(raw);
+    entries = JSON.parse(raw);
   } catch {
-    throw new Error(`expected a JSON array of keys, got: ${raw.slice(0, 80)}`);
+    throw new Error(`expected a JSON array of entries, got: ${raw.slice(0, 80)}`);
   }
-  if (!Array.isArray(keys) || keys.length === 0) throw new Error("allowlist must be a non-empty array");
-  const known = new Map(entries(catalog).map((e) => [e.key, e]));
-  const bad = keys.filter((k) => !known.has(k));
-  if (bad.length) throw new Error(`not in catalog: ${bad.join(", ")}`);
+  if (!Array.isArray(entries) || entries.length === 0) throw new Error("allowlist must be a non-empty array");
 
-  // Keys only. The rubric and the launch hint stay in the catalog, so an edit to a
-  // `fits` line applies on the next route without anyone re-running setup.
-  const file = { confidence_threshold: catalog.confidence_threshold, keys };
+  const known = new Set(catalog.harnesses.map((h) => h.id));
+  const str = (v) => typeof v === "string" && v.trim() !== "";
+  entries.forEach((e, i) => {
+    const at = `entry ${i}`;
+    if (!known.has(e?.harness)) throw new Error(`${at}: unknown harness ${JSON.stringify(e?.harness)}`);
+    if (!str(e.model)) throw new Error(`${at}: model must be a non-empty string`);
+    // `fits` is the whole rubric the router judges against, so an entry without one
+    // is an option the model cannot reason about. Refuse it rather than route blind.
+    if (!str(e.fits)) throw new Error(`${at} (${e.harness}:${e.model}): fits must be a non-empty string`);
+    if (e.launch !== undefined && !str(e.launch)) throw new Error(`${at}: launch must be a non-empty string`);
+  });
+
+  const file = {
+    confidence_threshold: catalog.confidence_threshold,
+    entries: entries.map(({ harness, model, fits, launch }) =>
+      launch === undefined ? { harness, model, fits } : { harness, model, fits, launch },
+    ),
+  };
   mkdirSync(dirname(allowlistPath()), { recursive: true });
   writeFileSync(allowlistPath(), `${JSON.stringify(file, null, 2)}\n`);
-  out({ written: allowlistPath(), entries: keys });
+  out({ written: allowlistPath(), entries: file.entries.map((e) => `${e.harness}:${e.model}`) });
 };
 
 const route = async (catalog, task) => {
   const path = allowlistPath();
   if (!existsSync(path)) throw new Error(`no allowlist at ${path} -- run /delegate:setup first`);
   const list = JSON.parse(readFileSync(path, "utf8"));
-  const byKey = new Map(entries(catalog).map((e) => [e.key, e]));
   const byHarness = new Map(catalog.harnesses.map((h) => [h.id, h]));
+  const all = resolve(catalog, list);
 
-  const unknown = list.keys.filter((k) => !byKey.has(k));
-  const allowed = list.keys.filter((k) => byKey.has(k)).map((k) => byKey.get(k));
-  const unavailable = allowed.filter((e) => !available(byHarness.get(e.harness)));
-  const candidates = allowed.filter((e) => !unavailable.includes(e));
+  const unknown = all.filter((e) => !e.known);
+  const unavailable = all.filter((e) => e.known && !available(byHarness.get(e.harness)));
+  const candidates = all.filter((e) => e.known && !unavailable.includes(e));
   if (candidates.length === 0) throw new Error("no allowlisted entry is reachable on this machine");
 
   if (!process.env.TYPESAFE_API_KEY) {
@@ -172,7 +214,7 @@ const route = async (catalog, task) => {
     below_threshold: answer.confidence < threshold,
     probabilities: answer.probabilities,
     dropped_unavailable: unavailable.map((e) => e.key),
-    dropped_unknown: unknown,
+    dropped_unknown: unknown.map((e) => e.key),
   });
 };
 

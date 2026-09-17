@@ -1,10 +1,11 @@
 {
-  "note": "What each harness is and what each model inside it is good at. `traits` describes the harness; `fits` describes the model. Both strings go to TypeSafe as the rubric for one option, so write them as plain judgement, not marketing. No Fable-class model appears here, by construction. Edit this file to add a model: run the harness's own list command for exact ids (`devin models list`, `opencode models`), then write a `fits` line that says what the model should and should not get.",
+  "note": "Harness knowledge, plus a few suggested models per harness. The harness fields (`traits`, `bin`, `launch`, `list`) are the bundled part and apply to every entry. The `models` arrays are only suggestions to seed a setup; the real roster comes from the harness's own `list` command, which runs to hundreds of ids. What a chosen model is good and bad at lives in the allowlist, not here, because no bundled file can describe 1600 models. Use the overlay at ~/.claude/delegate-catalog.json to add a whole harness.",
   "confidence_threshold": 0.55,
   "harnesses": [
     {
       "id": "inline",
       "bin": null,
+      "list": null,
       "traits": "No delegation. The current session does the work itself, with the full conversation already loaded and every tool already granted.",
       "launch": "Do the work in this session. Start no agent and no CLI.",
       "models": [
@@ -17,6 +18,7 @@
     {
       "id": "subagent",
       "bin": null,
+      "list": null,
       "traits": "A sub-agent inside this same harness. It gets a fresh context window and the same tools, and it reports a summary back. No outside login, no separate CLI, and its file reads never enter this session's context.",
       "launch": "Agent tool: subagent_type general-purpose, model {model}.",
       "models": [
@@ -37,6 +39,7 @@
     {
       "id": "codex",
       "bin": "codex",
+      "list": null,
       "traits": "An outside CLI in a read-only sandbox. It reads and reports; it writes no file and changes nothing. Strongest choice for an adversarial second opinion, because it did not write the code it reads.",
       "launch": "codex exec -m {model} -c model_reasoning_effort='\"medium\"' -c approval_policy='\"never\"' --sandbox read-only --cd {cwd} --skip-git-repo-check --json -o {out} \"$(cat {prompt})\" < /dev/null > {events} 2> {err}",
       "models": [
@@ -49,6 +52,7 @@
     {
       "id": "cursor-agent",
       "bin": "cursor-agent",
+      "list": "cursor-agent models",
       "traits": "An outside CLI that writes to the working tree and runs commands. The default choice when the task must change files. It does not commit, and it can re-indent what it touches.",
       "launch": "cursor-agent -p \"<prompt>\" --model {model} --force",
       "models": [
@@ -69,6 +73,7 @@
     {
       "id": "opencode",
       "bin": "opencode",
+      "list": "opencode models",
       "traits": "An outside CLI that reaches many providers under one login, so it is where a named non-Anthropic model or a cheap second opinion comes from. Reads and reports by default; it writes only with --auto. Routes and credit run out often, so a run can exit 0 with nothing done.",
       "launch": "opencode run -m {model} --format json \"<prompt>\" < /dev/null > events.jsonl 2> err.log",
       "models": [
@@ -81,6 +86,7 @@
     {
       "id": "devin",
       "bin": "devin",
+      "list": "devin models list",
       "traits": "An outside CLI that loads this repository's own AGENTS.md, CLAUDE.md, and Claude Code skills, so it starts with the project's rules already in hand. Writes inside its workspace sandbox. Wide model choice under one login, and no event stream to read while it runs.",
       "launch": "cd {cwd} && devin --model {model} --sandbox --respect-workspace-trust false --prompt-file {prompt} --export {transcript} -p < /dev/null > {out} 2> {err}",
       "models": [
